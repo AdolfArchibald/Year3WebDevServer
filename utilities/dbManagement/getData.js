@@ -27,14 +27,12 @@ let client;
 // Function to connect to the MongoDB database and return the db instance
 async function getDB() {
     if (!client) {
-        client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+        client = new MongoClient(uri);
     }
 
     try {
-        // Connect to MongoDB server (if not already connected)
-        if (!client.isConnected()) {
-            await client.connect();
-        }
+        // Connect to MongoDB server
+        await client.connect();
 
         // Access the database
         const db = client.db(dbName);
