@@ -32,7 +32,7 @@ app.get('/test-image', (req, res) => {
 });
 
 // Test route to return a collection from the DB
-app.get('/dbcollection', async (req, res) => {
+app.get('/lessons', async (req, res) => {
     try {
         // Get the 'lessons' collection
         const collection = await getCollection('lessons');
@@ -48,6 +48,35 @@ app.get('/dbcollection', async (req, res) => {
         // If there is an error, send a 500 error
         console.error('Error fetching collection:', error);
         res.status(500).json({ error: 'Failed to fetch collection' });
+    }
+});
+
+
+// POST route to insert a new order
+app.post('/newOrder', async (req, res) => {
+    try {
+        // Get the 'orders' collection
+        const collection = await getCollection('orders');
+        
+        // Get the order data from the request body
+        const newOrder = req.body;
+
+        // Insert the new order into the collection
+        const result = await collection.insertOne(newOrder);
+        
+        // Check if the insertion was successful
+        if (result.acknowledged) {
+            res.status(201).json({ message: 'Order successfully created', orderId: result.insertedId });
+        }
+        else {
+            res.status(500).json({ error: 'Failed to create order' });
+        }
+
+    } 
+    catch (error) {
+        // If there is an error, send a 500 error
+        console.error('Error inserting new order:', error);
+        res.status(500).json({ error: 'Failed to insert order' });
     }
 });
 
