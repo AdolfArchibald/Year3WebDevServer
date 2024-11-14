@@ -80,6 +80,61 @@ app.post('/newOrder', async (req, res) => {
     }
 });
 
+// PUT route to update a specific attribute of a lesson
+app.put('/updateLesson/:id/:attribute/:newValue', async (req, res) => {
+    try {
+        // Get the lesson ID, attribute name, and new value from the request parameters
+        const { id, attribute, newValue } = req.params;
+
+        // Ensure the ID is a number
+        let parsedID = parseInt(id, 10);
+        if (isNaN(parsedID)) {
+            return res.status(400).json({ error: 'ID is not a valid number' });
+        }
+    
+        // Parse newValue as it might be a string
+        let parsedValue = newValue;
+
+        // Attempt to convert numeric attributes like "spaces" to a number
+        if (attribute === "spaces" || attribute == "price") {
+            parsedValue = parseInt(newValue, 10);
+
+            // Ensure that availableSpaces is a valid number and give feedback
+            if (isNaN(parsedValue) || parsedValue < 0) {
+                return res.status(400).json({ error: 'Invalid value (HINT: It might be negative or NaN; please check).' });
+            }
+        }
+
+        // Ensure that the attribute exists in the lesson document schema
+        const allowedAttributes = ['spaces', 'subject', 'location', 'price'];
+
+        if (!allowedAttributes.includes(attribute)) {
+            return res.status(400).json({ error: 'Invalid attribute' });
+        }
+
+        // Get the 'lessons' collection
+        const collection = await getCollection('lessons');
+
+        // Update the lesson (with the matching ID) attribute with the new value
+        const result = await collection.updateOne(
+            { id: parseInt(id, 10) },
+            { $set: { [attribute]: parsedValue } } // Set the given attribute to the new value
+        );
+
+        // Check if the update was successful
+        if (result.modifiedCount === 1) {
+            res.status(200).json({ message: 'Lesson updated successfully' });
+        }
+        else {
+            res.status(404).json({ error: 'Lesson not found or no changes made. NOTE: You might have already updated the Lesson.' });
+        }
+    }
+    catch (error) {
+        // If there is an error, send a 500 error
+        console.error('Error updating lesson:', error);
+        res.status(500).json({ error: 'Failed to update lesson' });
+    }
+});
 
 // Start the server
 app.listen(port, () => {
