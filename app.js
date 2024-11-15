@@ -31,7 +31,7 @@ app.get('/test-image', (req, res) => {
     res.redirect(imageUrl);
 });
 
-// Test route to return a collection from the DB
+// Route to return the lessons collection from the DB
 app.get('/lessons', async (req, res) => {
     try {
         // Get the 'lessons' collection
@@ -138,5 +138,5 @@ app.put('/updateLesson/:id/:attribute/:newValue', async (req, res) => {
 
 // Start the server
 app.listen(port, () => {
-  console.log(`Express app listening at http://localhost:${port}`);
+  console.log(`Express app listening.`);
 });

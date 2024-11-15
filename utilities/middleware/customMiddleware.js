@@ -13,7 +13,7 @@ function logger(req, res, next) {
     // Override the send method to capture the response data
     res.send = function (body) {
         // Log the response body
-        console.log('Response:', body);
+        console.log('Response Sent');
 
         // Call the original send method with the response body
         return originalSend.call(this, body);
