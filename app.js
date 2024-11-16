@@ -80,51 +80,107 @@ app.post('/newOrder', async (req, res) => {
     }
 });
 
-app.put('/updateLesson/:ids/:attribute/:newValue', async (req, res) => {
+app.put('/updateLessons', async (req, res) => {
     try {
-        // Extract parameters
-        const { ids, attribute, newValue } = req.params;
+        // Extract the object from the request body
+        const { spaceNeeded, id, attribute, newValue } = req.body;
 
-        // Split and validate IDs
-        const parsedIDs = ids.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-        if (parsedIDs.length === 0) {
-            return res.status(400).json({ error: 'Invalid or missing IDs' });
-        }
-
-        // Validate attribute
-        const allowedAttributes = ['spaces', 'subject', 'location', 'price'];
-        if (!allowedAttributes.includes(attribute)) {
-            return res.status(400).json({ error: 'Invalid attribute' });
-        }
-
-        // Parse and validate the new value
-        let parsedValue = newValue;
-        if (['spaces', 'price'].includes(attribute)) {
-            parsedValue = parseInt(newValue, 10);
-            if (isNaN(parsedValue) || parsedValue < 0) {
-                return res.status(400).json({ error: 'Invalid value for numeric attribute' });
+        // Case 1: Handle spaceNeeded when no id, attribute, or newValue is provided
+        if (spaceNeeded && (!id || !attribute || !newValue)) {
+            // Validate that spaceNeeded is an array and not empty
+            if (!Array.isArray(spaceNeeded) || spaceNeeded.length === 0) {
+                return res.status(400).json({ error: 'If provided, "spaceNeeded" must be a non-empty array' });
             }
+
+            // Get the 'lessons' collection
+            const collection = await getCollection('lessons');
+
+            // Loop through each item in spaceNeeded array
+            for (const lessonUpdate of spaceNeeded) {
+                const { id, spaces } = lessonUpdate;
+
+                // Validate that the id is a number
+                const parsedId = parseInt(id, 10);
+                if (isNaN(parsedId)) {
+                    return res.status(400).json({ error: `"id" must be a valid number for lesson ${JSON.stringify(lessonUpdate)}` });
+                }
+
+                // Retrieve the current lesson based on id
+                const currentLesson = await collection.findOne({ id: parsedId });
+                
+                if (!currentLesson) {
+                    return res.status(404).json({ error: `Lesson with id ${parsedId} not found` });
+                }
+
+                // Ensure that current lesson has a valid spaces value
+                const currentSpaces = currentLesson.spaces || 0;
+
+                // Calculate the new spaces value by subtracting the requested spaces
+                const updatedSpaces = currentSpaces - spaces;
+
+                // Update the lesson with the new spaces value
+                const updateResult = await collection.updateOne(
+                    { id: parsedId },
+                    { $set: { spaces: updatedSpaces } }
+                );
+
+                if (updateResult.modifiedCount === 0) {
+                    return res.status(404).json({ error: `Failed to update lesson with id ${parsedId}` });
+                }
+            }
+            return res.status(200).json({ message: 'Lessons updated successfully with spaceNeeded', spaceNeeded });
         }
 
-        // Get the 'lessons' collection
-        const collection = await getCollection('lessons');
+        // Case 2: Handle id, attribute, and newValue (normal update scenario; not an order from the website)
+        if (id && attribute && newValue) {
+            // Validate that the id isa  number
+            const parsedId = parseInt(id, 10);
+            if (isNaN(parsedId)) {
+                return res.status(400).json({ error: '"id" must be a valid number' });
+            }
 
-        // Update lessons
-        const result = await collection.updateMany(
-            { id: { $in: parsedIDs } },
-            { $set: { [attribute]: parsedValue } }
-        );
+            // Validate the "attribute"
+            const allowedAttributes = ['subject', 'location', 'price', 'spaces', 'image'];
+            if (!allowedAttributes.includes(attribute)) {
+                return res.status(400).json({ error: 'Invalid attribute, must be one of: subject, location, price, spaces, image' });
+            }
 
-        // Respond with the result
-        if (result.modifiedCount > 0) {
-            res.status(200).json({ message: 'Lessons updated successfully', modifiedCount: result.modifiedCount });
-        } else {
-            res.status(404).json({ error: 'No lessons found or no changes made' });
+            // If the attribute is "price" or "spaces", validate that the newValue is numeric
+            let parsedValue = newValue;
+            if (['price', 'spaces'].includes(attribute)) {
+                parsedValue = parseFloat(newValue);  // Use parseFloat to handle decimal numbers as well (numbers converted back to INT if possible before adding to DB)
+                
+                if (isNaN(parsedValue)) {
+                    return res.status(400).json({ error: `"newValue" must be a valid number for attribute "${attribute}"` });
+                }
+            }
+
+            // Get the 'lessons' collection (implement logic for actual database update)
+            const collection = await getCollection('lessons');
+
+            // Update the lesson with the given information (done dynamically with the given info)
+            const result = await collection.updateOne(
+                { id: parsedId },
+                { $set: { [attribute]: parsedValue } }
+            );
+
+            // Check if the update was successful
+            if (result.modifiedCount === 1) {
+                res.status(200).json({ message: 'Lesson updated successfully' });
+            }
+            else {
+                res.status(404).json({ error: 'Lesson not found or no changes made' });
+            }
+
+            return;
         }
-    } 
-    catch (error) {
-        console.error('Error updating lessons:', error);
-        res.status(500).json({ error: 'Failed to update lessons' });
+
+        // If neither case is met, return an error
+        return res.status(400).json({ error: 'Invalid request, either "spaceNeeded" or "id", "attribute", and "newValue" must be provided' });
+
+    } catch (error) {
+        console.error('Error with the PUT', error);
+        res.status(500).json({ error: 'Failed to run the PUT route' });
     }
 });
 
