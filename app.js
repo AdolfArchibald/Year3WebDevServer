@@ -80,61 +80,54 @@ app.post('/newOrder', async (req, res) => {
     }
 });
 
-// PUT route to update a specific attribute of a lesson
-app.put('/updateLesson/:id/:attribute/:newValue', async (req, res) => {
+app.put('/updateLesson/:ids/:attribute/:newValue', async (req, res) => {
     try {
-        // Get the lesson ID, attribute name, and new value from the request parameters
-        const { id, attribute, newValue } = req.params;
+        // Extract parameters
+        const { ids, attribute, newValue } = req.params;
 
-        // Ensure the ID is a number
-        let parsedID = parseInt(id, 10);
-        if (isNaN(parsedID)) {
-            return res.status(400).json({ error: 'ID is not a valid number' });
-        }
-    
-        // Parse newValue as it might be a string
-        let parsedValue = newValue;
-
-        // Attempt to convert numeric attributes like "spaces" to a number
-        if (attribute === "spaces" || attribute == "price") {
-            parsedValue = parseInt(newValue, 10);
-
-            // Ensure that availableSpaces is a valid number and give feedback
-            if (isNaN(parsedValue) || parsedValue < 0) {
-                return res.status(400).json({ error: 'Invalid value (HINT: It might be negative or NaN; please check).' });
-            }
+        // Split and validate IDs
+        const parsedIDs = ids.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+        if (parsedIDs.length === 0) {
+            return res.status(400).json({ error: 'Invalid or missing IDs' });
         }
 
-        // Ensure that the attribute exists in the lesson document schema
+        // Validate attribute
         const allowedAttributes = ['spaces', 'subject', 'location', 'price'];
-
         if (!allowedAttributes.includes(attribute)) {
             return res.status(400).json({ error: 'Invalid attribute' });
+        }
+
+        // Parse and validate the new value
+        let parsedValue = newValue;
+        if (['spaces', 'price'].includes(attribute)) {
+            parsedValue = parseInt(newValue, 10);
+            if (isNaN(parsedValue) || parsedValue < 0) {
+                return res.status(400).json({ error: 'Invalid value for numeric attribute' });
+            }
         }
 
         // Get the 'lessons' collection
         const collection = await getCollection('lessons');
 
-        // Update the lesson (with the matching ID) attribute with the new value
-        const result = await collection.updateOne(
-            { id: parseInt(id, 10) },
-            { $set: { [attribute]: parsedValue } } // Set the given attribute to the new value
+        // Update lessons
+        const result = await collection.updateMany(
+            { id: { $in: parsedIDs } },
+            { $set: { [attribute]: parsedValue } }
         );
 
-        // Check if the update was successful
-        if (result.modifiedCount === 1) {
-            res.status(200).json({ message: 'Lesson updated successfully' });
+        // Respond with the result
+        if (result.modifiedCount > 0) {
+            res.status(200).json({ message: 'Lessons updated successfully', modifiedCount: result.modifiedCount });
+        } else {
+            res.status(404).json({ error: 'No lessons found or no changes made' });
         }
-        else {
-            res.status(404).json({ error: 'Lesson not found or no changes made. NOTE: You might have already updated the Lesson.' });
-        }
-    }
+    } 
     catch (error) {
-        // If there is an error, send a 500 error
-        console.error('Error updating lesson:', error);
-        res.status(500).json({ error: 'Failed to update lesson' });
+        console.error('Error updating lessons:', error);
+        res.status(500).json({ error: 'Failed to update lessons' });
     }
 });
+
 
 // Start the server
 app.listen(port, () => {
